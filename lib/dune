@@ -1,0 +1,4 @@
+(library
+ (name ocaml_lite))
+
+(ocamllex lexer)
