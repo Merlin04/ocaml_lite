@@ -1,4 +1,5 @@
 open OUnit2
+open Ocaml_lite.Grammar
 open Ocaml_lite.Lexer
 
 let lex_tests = "test suite for tokenize" >::: [

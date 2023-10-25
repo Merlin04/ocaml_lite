@@ -29,3 +29,7 @@ setup.log
 # Local OPAM switch
 _opam/
 
+lib/grammar.mli
+lib/grammar.ml
+lib/grammar.automaton
+lib/grammar.conflicts

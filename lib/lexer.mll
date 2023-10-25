@@ -1,57 +1,6 @@
 {
 
-(*
-
-NOTE: If you decide to use a parser generator then you should remove this token
-type definition and replace it with %token directives in the parser file. You
-will then need to add "open Parser" to the top of this file (inside the braces).
-You'll need to make sure the token names you provide in your parser file match
-the ones provided here, or else change the code below to match the new names.
-
-*)
-
-type token =
-  | Type             (** type - keyword *)
-  | Of               (** of - keyword *)
-  | Let              (** let - keyword *)
-  | Rec              (** rec - keyword *)
-  | In               (** in - keyword *)
-  | If               (** if - keyword *)
-  | Then             (** then - keyword *)
-  | Else             (** else - keyword *)
-  | Match            (** match - keyword *)
-  | With             (** with - keyword *)
-  | Fun              (** fun - keyword *)
-  | True             (** true - keyword *)
-  | False            (** false - keyword *)
-  | Mod              (** mod - keyword *)
-  | TInt             (** int - type name *)
-  | TBool            (** bool - type name *)
-  | TString          (** string - type name *)
-  | TUnit            (** unit - type name *)
-  | Eq               (** = - binary operator *)
-  | Plus             (** + - binary operator *)
-  | Minus            (** - - binary operator *)
-  | Times            (** * - binary operator *)
-  | Divide           (** / - binary operator *)
-  | Lt               (** < - binary operator *)
-  | Concat           (** ^ - binary operator *)
-  | And              (** && - binary operator *)
-  | Or               (** || - binary operator *)
-  | Not              (** ! - unary operator *)
-  | Negate           (** ~ - unary operator *)
-  | DoubleSemicolon  (** ;; *)
-  | Colon            (** : *)
-  | Arrow            (** -> *)
-  | DoubleArrow      (** => *)
-  | LParen           (** ( *)
-  | RParen           (** ) *)
-  | Pipe             (** | *)
-  | Comma            (** , *)
-  | Id of string     (** Identifier, like a variable or function name *)
-  | Int of int       (** Integer literal *)
-  | String of string (** String literal *)
-  | EOF              (** End-of-file - you can ignore this *)
+open Grammar
 
 let tok_to_str (t : token) : string =
   match t with

@@ -4,11 +4,13 @@
 
 (generate_opam_files true)
 
-(authors "Greg Anderson")
+(authors "B Smith")
 
 (license BSD3)
 
 (package
  (name ocaml_lite)
  (synopsis "OCaml-lite language.")
- (depends ocaml dune))
+ (depends ocaml dune menhir))
+
+(using menhir 2.1)
