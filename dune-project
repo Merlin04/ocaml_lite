@@ -11,6 +11,6 @@
 (package
  (name ocaml_lite)
  (synopsis "OCaml-lite language.")
- (depends ocaml dune menhir))
+ (depends ocaml dune menhir ppx_deriving nice_parser))
 
 (using menhir 2.1)

@@ -7,6 +7,8 @@ depends: [
   "ocaml"
   "dune" {>= "3.8"}
   "menhir"
+  "ppx_deriving"
+  "nice_parser"
   "odoc" {with-doc}
 ]
 build: [

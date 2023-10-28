@@ -50,7 +50,7 @@ let tok_to_str (t : token) : string =
 let sb = Buffer.create 256
 
 (** A new kind of error to be thrown when lexing fails. *)
-exception SyntaxError of string
+exception LexError of string
 
 }
 
@@ -61,9 +61,9 @@ let id = ['_' 'a'-'z' 'A'-'Z'] ['_' 'a'-'z' 'A'-'Z' '0'-'9']*
 let whitespace = [' ' '\t' '\r' '\n']+
 let int = ['0'-'9']+
 
-rule tok = parse
+rule next_token = parse
 | whitespace
-    { tok lexbuf }
+    { next_token lexbuf }
 | int as i
     { Int (int_of_string i) }
 | "type"
@@ -151,7 +151,7 @@ rule tok = parse
 | eof
     { EOF }
 | _
-    { raise (SyntaxError ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }
+    { raise (LexError ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }
 and string = parse
 | '"'
     { () }
@@ -160,16 +160,6 @@ and string = parse
       string lexbuf }
 and comment = parse
 | "*)"
-    { tok lexbuf }
+    { next_token lexbuf }
 | _
     { comment lexbuf }
-
-{
-let tokenize (s : string) : token list =
-  let buf = Lexing.from_string s in
-  let rec helper acc =
-    match tok buf with
-    | EOF -> List.rev acc
-    | t -> helper (t :: acc) in
-  helper []
-}

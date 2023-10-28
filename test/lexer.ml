@@ -2,6 +2,14 @@ open OUnit2
 open Ocaml_lite.Grammar
 open Ocaml_lite.Lexer
 
+let tokenize (s : string) : token list =
+  let buf = Lexing.from_string s in
+  let rec helper acc =
+    match next_token buf with
+    | EOF -> List.rev acc
+    | t -> helper (t :: acc) in
+  helper []
+
 let lex_tests = "test suite for tokenize" >::: [
     "random code" >::
     (fun _ -> assert_equal

@@ -6,24 +6,31 @@ type ol_type =
   | StringType
   | UnitType
   | IdType of string
+[@@deriving show]
 type ol_binop = Plus | Minus | Times | Divide | Mod | Lt | Eq | Concat | And | Or
+[@@deriving show]
 type ol_unop = Not | Negate
+[@@deriving show]
 type ol_id_with_t = { id : string; t : ol_type option }
+[@@deriving show]
 type ol_let = {
   id : string;
   is_rec : bool;
   params : ol_id_with_t list;
   t : ol_type option;
   expr : ol_expr }
+[@@deriving show]
 and ol_binding =
   | TypeBinding of {
     id : string;
     t : ol_id_with_t list }
   | LetBinding of ol_let
+[@@deriving show]
 and ol_match_branch = {
  id : string;
  vars : string list;
  e : ol_expr }
+[@@deriving show]
 and ol_expr =
   | LetExpr of { l : ol_let; e : ol_expr }
   | IfExpr of { cond : ol_expr; e_if : ol_expr; e_else : ol_expr }
@@ -38,5 +45,7 @@ and ol_expr =
   | StringExpr of string
   | UnitExpr
   | IdExpr of string
+[@@deriving show]
 
 type ol_prog = ol_binding list
+[@@deriving show]

@@ -33,3 +33,5 @@ lib/grammar.mli
 lib/grammar.ml
 lib/grammar.automaton
 lib/grammar.conflicts
+
+*.bak*

@@ -52,7 +52,7 @@ open Ast
 %type <ol_id_with_t> type_binding_constructor
 %type <ol_binding> binding
 %type <ol_id_with_t> param
-%type <ol_expr> expr
+%type <ol_expr> expr, expr_app, expr_other, match_expr
 %type <ol_match_branch> match_branch
 %type <string list> pattern_vars
 %type <ol_type> ol_type
@@ -60,6 +60,7 @@ open Ast
 %type <ol_unop> unop
 
 %left Application
+// %right DoubleArrow // the precedence rule being here fixes the below issue, but causes associativity of matches to break
 %left Or
 %left And
 %left Lt, Eq
@@ -69,7 +70,7 @@ open Ast
 %left Not
 %right Arrow
 %right Else
-%right DoubleArrow
+%right DoubleArrow // the precedence rule being here causes | a => a + a to result in "unexpected token" on the next |
 %right In
 
 %%
@@ -93,10 +94,13 @@ let param :=
   | LParen; id = Id; Colon; t = ol_type; RParen; { { id; t = Some t } }
 
 let expr :=
-  | f = other_expr; a = expr; { ApplExpr { f; a } } %prec Application
-  | ~ = other_expr; <>
+  | ~ = expr_app; <>
 
-let other_expr :=
+let expr_app :=
+  | f = expr_other; a = expr; { ApplExpr { f; a } } %prec Application
+  | ~ = expr_other; <>
+
+let expr_other :=
   | l = let_component; In; e = expr; { LetExpr ({ l; e }) }
   | If; cond = expr; Then; e_if = expr; Else; e_else = expr; { IfExpr { cond; e_if; e_else } }
   | Fun; params = param+; t = option(Colon; ol_type); DoubleArrow; e = expr; { FunExpr { params; t; e } }
