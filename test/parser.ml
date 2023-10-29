@@ -116,11 +116,32 @@ let test_parser_complex_nested_match _ =
       }]
     })
 
+let fun_appl_assoc_test _ =
+  p_assert_equal_expr
+    "(fun a b => fun c d => e) f g"
+    (ApplExpr {
+      f = ApplExpr {
+        f = FunExpr {
+          params = [{ id = "a"; t = None }; { id = "b"; t = None }];
+          t = None;
+          e = FunExpr {
+            params = [{ id = "c"; t = None }; { id = "d"; t = None }];
+            t = None;
+            e = IdExpr "e";
+          };
+        };
+        a = IdExpr "f"
+      };
+      a = IdExpr "g";
+    })
+
+
 let parse_tests =
   "test suite for parser"
   >::: [
     "basic let binding" >:: test_parser_let_binding;
     "let expression" >:: test_parser_let_expr;
     "nested match expressions" >:: test_parser_nested_match;
-    "complex nested match expressions (and precedence of binops)" >:: test_parser_complex_nested_match
+    "complex nested match expressions (and precedence of binops)" >:: test_parser_complex_nested_match;
+    "fun and application associativity" >:: fun_appl_assoc_test
   ]
