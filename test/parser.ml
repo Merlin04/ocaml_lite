@@ -135,6 +135,66 @@ let fun_appl_assoc_test _ =
       a = IdExpr "g";
     })
 
+let test_parser_type_decl _ =
+  p_assert_equal
+    "type a = A | B of int;;"
+    [TypeBinding {
+      id = "a";
+      t = [
+        { id = "A"; t = None };
+        { id = "B"; t = Some IntType }
+      ];
+    }]
+
+let test_parser_nested_unop _ =
+  p_assert_equal_expr
+    "not ~ not not a"
+    (UnopExpr {
+      op = Not;
+      e = UnopExpr {
+        op = Negate;
+        e = UnopExpr {
+          op = Not;
+          e = UnopExpr {
+            op = Not;
+            e = IdExpr "a";
+          }
+        }
+      }
+    })
+
+let test_parser_arith_assoc _ =
+  p_assert_equal_expr
+    "a + b * c"
+    (BinopExpr {
+      a = IdExpr "a";
+      op = Plus;
+      b = BinopExpr {
+        a = IdExpr "b";
+        op = Times;
+        b = IdExpr "c";
+      }
+    })
+
+let test_parser_unit_expr _ =
+  p_assert_equal_expr
+    "()"
+    (UnitExpr)
+
+let test_appl_in_tuple _ =
+  p_assert_equal_expr
+    "(a b, c, d e)"
+    (TupleExpr [
+      ApplExpr {
+        f = IdExpr "a";
+        a = IdExpr "b";
+      };
+      IdExpr "c";
+      ApplExpr {
+        f = IdExpr "d";
+        a = IdExpr "e";
+      }
+    ])
 
 let parse_tests =
   "test suite for parser"
@@ -143,5 +203,10 @@ let parse_tests =
     "let expression" >:: test_parser_let_expr;
     "nested match expressions" >:: test_parser_nested_match;
     "complex nested match expressions (and precedence of binops)" >:: test_parser_complex_nested_match;
-    "fun and application associativity" >:: fun_appl_assoc_test
+    "fun and application associativity" >:: fun_appl_assoc_test;
+    "type declaration" >:: test_parser_type_decl;
+    "nested unops" >:: test_parser_nested_unop;
+    "arith associativity" >:: test_parser_arith_assoc;
+    "unit expression" >:: test_parser_unit_expr;
+    "application in tuple" >:: test_appl_in_tuple;
   ]

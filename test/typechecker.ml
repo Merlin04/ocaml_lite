@@ -25,6 +25,15 @@ let test_op_typings _ =
 let test_match_inference _ =
   assert_well_typed "let a p = string_of_int (match p with | 5 => 6 | a => 10);; let b : string = a 5;;" true
 
+let test_type_decl _ =
+  assert_well_typed "type a = int;; let b : a = 5;;" true
+
+let test_type_constructors _ =
+  assert_well_typed "type a = | A | B of int;; let b : a = A;; let c : a = B 5;;" true
+
+let test_type_constructors_check _ =
+  assert_well_typed "type a = | A | B of int;; let b : a = B true;;" false
+
 let typechecker_tests =
   "test suite for typechecker"
   >::: [
@@ -35,4 +44,7 @@ let typechecker_tests =
     "builtin strictly typed" >:: test_builtins_type;
     "operator typing" >:: test_op_typings;
     "match inference" >:: test_match_inference;
+    "type declaration" >:: test_type_decl;
+    "type constructors" >:: test_type_constructors;
+    "type constructors type-check properly" >:: test_type_constructors_check;
   ]
