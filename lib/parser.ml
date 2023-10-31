@@ -1,19 +1,8 @@
 open Ast
 open Grammar
+open Earley
 
-(* exception ParseError of string *)
+let parser prog =
+  | b:CHR("a")
 
-include Nice_parser.Make(struct
-  type result = ol_prog
-  type token = Grammar.token
-  exception ParseError = Grammar.Error
-  let parse = Grammar.prog
-  include Lexer
-end)
-
-let () = pp_exceptions ()
-
-let parse = parse_string
-
-(* let parse (src : string) : ol_prog = *)
-(*  src |> Lexing.from_string |> Grammar.prog Lexer.tok *)
+let parse =
