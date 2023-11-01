@@ -1,6 +1,6 @@
 type ol_type =
   | FunType of ol_type * ol_type
-  | TupleType of ol_type * ol_type
+  | TupleType of ol_type list
   | IntType
   | BoolType
   | StringType
