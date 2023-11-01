@@ -107,12 +107,12 @@ let test_parser_complex_nested_match _ =
               op = Plus;
               b = IntExpr 5;
             }
+          }; {
+            id = "i";
+            vars = [];
+            e = IdExpr "j";
           }]
         }; }
-      }; {
-        id = "i";
-        vars = [];
-        e = IdExpr "j";
       }]
     })
 
@@ -196,6 +196,23 @@ let test_appl_in_tuple _ =
       }
     ])
 
+let test_type_prec _ =
+  p_assert_equal
+    "type a = | A of int * unit * string -> string * int -> unit * int;;"
+    [TypeBinding {
+      id = "a";
+      t = [{
+        id = "A";
+        t = Some (FunType (
+          TupleType [IntType; UnitType; StringType],
+          FunType (
+            TupleType [StringType; IntType],
+            TupleType [UnitType; IntType]
+          )
+        ))
+      }]
+    }]
+
 let parse_tests =
   "test suite for parser"
   >::: [
@@ -209,4 +226,5 @@ let parse_tests =
     "arith associativity" >:: test_parser_arith_assoc;
     "unit expression" >:: test_parser_unit_expr;
     "application in tuple" >:: test_appl_in_tuple;
+    "tuple type precedence" >:: test_type_prec;
   ]

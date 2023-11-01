@@ -2,48 +2,52 @@
 
 open Ast
 
+let build_appl = function
+  | h :: t -> List.fold_left (fun acc cur -> ApplExpr { f = acc; a = cur }) h t
+  | _ -> failwith "build_appl called on empty list"
+
 %}
 
-%token Type
-%token Of
-%token Let
-%token Rec
-%token In
-%token If
-%token Then
-%token Else
-%token Match
-%token With
-%token Fun
-%token True
-%token False
-%token Mod
-%token TInt
-%token TBool
-%token TString
-%token TUnit
-%token Eq
-%token Plus
-%token Minus
-%token Times
-%token Divide
-%token Lt
-%token Concat
-%token And
-%token Or
-%token Not
-%token Negate
-%token DoubleSemicolon
-%token Colon
-%token Arrow
-%token DoubleArrow
-%token LParen
-%token RParen
-%token Pipe
-%token Comma
-%token <string> Id
-%token <int> Int
-%token <string> String
+%token Type "type"
+%token Of "of"
+%token Let "let"
+%token Rec "rec"
+%token In "in"
+%token If "if"
+%token Then "then"
+%token Else "else"
+%token Match "match"
+%token With "with"
+%token Fun "fun"
+%token True "true"
+%token False "false"
+%token Mod "mod"
+%token TInt "int"
+%token TBool "bool"
+%token TString "string"
+%token TUnit "unit"
+%token Eq "=="
+%token Plus "+"
+%token Minus "-"
+%token Times "*"
+%token Divide "/"
+%token Lt "<"
+%token Concat "^"
+%token And "&&"
+%token Or "||"
+%token Not "not"
+%token Negate "~"
+%token DoubleSemicolon ";;"
+%token Colon ":"
+%token Arrow "->"
+%token DoubleArrow "=>"
+%token LParen "("
+%token RParen ")"
+%token Pipe "|"
+%token Comma ","
+%token <string> Id "id"
+%token <int> Int "5"
+%token <string> String "\"hello\""
 %token EOF
 
 %start <ol_prog> prog
@@ -52,28 +56,41 @@ open Ast
 %type <ol_id_with_t> type_binding_constructor
 %type <ol_binding> binding
 %type <ol_id_with_t> param
-%type <ol_expr> expr, expr_app, expr_other, match_expr
+%type <ol_expr> expr, expr_appl, expr_other
 %type <ol_match_branch> match_branch
 %type <string list> pattern_vars
 %type <ol_type> ol_type
 %type <ol_binop> binop
 %type <ol_unop> unop
 
-%left Application
-// %right DoubleArrow // the precedence rule being here fixes the below issue, but causes associativity of matches to break
+%nonassoc In
+%nonassoc Else
+%right Arrow
+%right DoubleArrow
+
 %left Or
 %left And
 %left Lt, Eq
 %left Plus, Minus, Concat
 %left Times, Divide, Mod
-%left Negate
-%left Not
-%right Arrow
-%right Else
-%right DoubleArrow // the precedence rule being here causes | a => a + a to result in "unexpected token" on the next |
-%right In
+%nonassoc Negate
+%nonassoc Not
 
 %%
+
+(* List parser functions that were taken from the OCaml parser *)
+(* see https://github.com/ocaml/ocaml/blob/trunk/parsing/parser.mly#L1122 *)
+let reversed_separated_nontrivial_llist(separator, X) :=
+  | xs = reversed_separated_nontrivial_llist(separator, X); separator; x = X; { x :: xs }
+  | x1 = X; separator; x2 = X; { [x2; x1] }
+
+let reversed_nonempty_llist(X) :=
+  | x = X; { [ x ] }
+  | xs = reversed_nonempty_llist(X); x = X; { x :: xs }
+
+let nonempty_llist(X) :=
+  | ~ = rev(reversed_nonempty_llist(X)); <>
+
 
 let prog :=
   | EOF; { [] }
@@ -94,29 +111,20 @@ let param :=
   | LParen; id = Id; Colon; t = ol_type; RParen; { { id; t = Some t } }
 
 let expr :=
-  | ~ = expr_app; <>
-
-let expr_app :=
-  | f = expr; a = expr_other; { ApplExpr { f; a } } %prec Application
+  | ~ = expr_appl; <>
+  | ~ = expr_floating; <>
   | ~ = expr_other; <>
 
-let expr_other :=
-  | l = let_component; In; e = expr; { LetExpr ({ l; e }) }
-  | If; cond = expr; Then; e_if = expr; Else; e_else = expr; { IfExpr { cond; e_if; e_else } }
-  | Fun; params = param+; t = option(Colon; ol_type); DoubleArrow; e = expr; { FunExpr { params; t; e } }
-  | LParen; h = expr; Comma; t = separated_nonempty_list(Comma, expr); RParen; { TupleExpr (h :: t) }
+let expr_appl :=
+  | f = expr_other; a = nonempty_llist(expr_other); { (f :: a) |> build_appl }
+
+(* "floating" expressions which can't be inside an application because it has an expr on the outside of it *)
+let expr_floating :=
   | a = expr; op = binop; b = expr; { BinopExpr { a; op; b } }
   | op = unop; e = expr; { UnopExpr { op; e } }
-  | LParen; ~ = expr; RParen; <>
-  | ~ = Int; <IntExpr>
-  | True; { BoolExpr true }
-  | False; { BoolExpr false }
-  | ~ = String; <StringExpr>
-  | ~ = Id; <IdExpr>
-  | LParen; RParen; { UnitExpr }
-  | ~ = match_expr; <>
-
-let match_expr :=
+  | l = let_component; In; e = expr; { LetExpr ({ l; e }) }
+  | Fun; params = param+; t = option(Colon; ol_type); DoubleArrow; e = expr; { FunExpr { params; t; e } }
+  | If; cond = expr; Then; e_if = expr; Else; e_else = expr; { IfExpr { cond; e_if; e_else } }
   | Match; e = expr; With; Pipe?; b = separated_nonempty_list(Pipe, match_branch); { MatchExpr { e; branches = b } }
 
 let match_branch :=
@@ -126,15 +134,34 @@ let pattern_vars :=
   | id = Id; { [id] }
   | LParen; ~ = separated_nonempty_list(Comma, Id); RParen; <>
 
+let expr_other :=
+  | LParen; h = expr; Comma; t = separated_nonempty_list(Comma, expr); RParen; { TupleExpr (h :: t) }
+  | LParen; ~ = expr; RParen; <>
+  | ~ = Int; <IntExpr>
+  | True; { BoolExpr true }
+  | False; { BoolExpr false }
+  | ~ = String; <StringExpr>
+  | ~ = Id; <IdExpr>
+  | LParen; RParen; { UnitExpr }
+
 let ol_type :=
-  | a = ol_type; Arrow; b = ol_type; <FunType>
+  | ~ = ol_type_fun; <>
+  | ~ = ol_type_tuple; <>
+  | ~ = ol_type_other; <>
+
+let ol_type_other :=
   | LParen; ~ = ol_type; RParen; <>
-  | a = ol_type; Times; b = ol_type; <TupleType>
   | TInt; { IntType }
   | TBool; { BoolType }
   | TString; { StringType }
   | TUnit; { UnitType }
   | ~ = Id; <IdType>
+
+let ol_type_fun :=
+  | a = ol_type; Arrow; b = ol_type; <FunType>
+
+let ol_type_tuple :=
+  ~ = rev(reversed_separated_nontrivial_llist(Times, ol_type_other)); <TupleType>
 
 let binop ==
   | Plus; { Plus }

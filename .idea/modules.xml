@@ -2,9 +2,6 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/../conflicts/.idea/conflicts.iml" filepath="$PROJECT_DIR$/../conflicts/.idea/conflicts.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../conflicts-inclass/.idea/conflicts-inclass.iml" filepath="$PROJECT_DIR$/../conflicts-inclass/.idea/conflicts-inclass.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../lambda_calculus/.idea/lambda_calculus.iml" filepath="$PROJECT_DIR$/../lambda_calculus/.idea/lambda_calculus.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/ocaml_lite.iml" filepath="$PROJECT_DIR$/.idea/ocaml_lite.iml" />
     </modules>
   </component>
