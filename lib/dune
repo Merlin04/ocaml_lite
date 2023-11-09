@@ -1,5 +1,5 @@
 (library
- (preprocess (pps ppx_deriving.std))
+ (preprocess (staged_pps ppx_import ppx_deriving.std))
  (libraries nice_parser)
  (name ocaml_lite))
 

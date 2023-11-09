@@ -2,7 +2,7 @@ open OUnit2
 open Ocaml_lite.Parser
 open Ocaml_lite.Ast
 
- let p_assert_equal code expr = assert_equal (parse code) expr ~printer:show_ol_prog
+let p_assert_equal code expr = assert_equal (parse code) expr ~printer:show_ol_prog
 
 let test_parser_let_binding _ =
   p_assert_equal

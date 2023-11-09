@@ -33,9 +33,9 @@ and ol_match_branch = {
 [@@deriving show]
 and ol_expr =
   | LetExpr of { l : ol_let; e : ol_expr }
-  | IfExpr of { cond : ol_expr; e_if : ol_expr; e_else : ol_expr }
   | FunExpr of { params : ol_id_with_t list; t : ol_type option; e : ol_expr }
   | ApplExpr of { f : ol_expr; a : ol_expr }
+  | IfExpr of { cond : ol_expr; e_if : ol_expr; e_else : ol_expr }
   | TupleExpr of ol_expr list
   | BinopExpr of { a : ol_expr; op : ol_binop; b : ol_expr }
   | UnopExpr of { op : ol_unop; e : ol_expr }
