@@ -2,12 +2,22 @@ open Ast
 
 exception RuntimeError of string
 
-(* really awful and janky way to get ol_val into the top level scope *)
-(* (moving Context module into its own file and using ppx_import to copy ol_val in using this weird ocaml feature *)
-(* https://github.com/ocaml-ppx/ppx_deriving#working-with-existing-types *)
-(* I couldn't figure out how to just define it separately due to the mutual dependency between the type and the module *)
-(* if you have any idea how to do this please tell me! *)
-type ol_val = [%import: Context.ol_val [@with t := Context.t]]
+module Context = struct
+  type 'a t = 'a _context_t
+  type entry = _context_entry
+
+  let return s = (s, [])
+  let make s c : 'a t = (s, c)
+  let value (a : 'a t) = fst a
+  let list (a : 'a t) = snd a
+  let from s (c : 'a t) = make s (list c)
+  (* map for monad contents *)
+  let map2 (a : 'a t) (f : entry list -> entry list) = let v, l = a in (v, f l)
+  let ( let- ) = ( map2 )
+  let add (e : entry) (a : 'a t) = let- c = a in e :: c
+  let join (e : entry list) (a : 'a t) = let- c = a in e @ c
+  let get (k : string) (a : 'a t) = let c = list a in List.assoc_opt k c
+end
 
 let expr_of_ol_let (o : ol_let) = match o.params with
   | [] -> o.expr
@@ -25,18 +35,6 @@ let unwrap_bool = function
 let unwrap_unit = function
   | UnitVal -> UnitVal
   | _ -> raise (RuntimeError "Expected unit")
-
-(*let rec val_eq a b = match a with
-  | IntVal a_val -> (match b with IntVal b_val -> a_val = b_val | _ -> false)
-  | StringVal a_val -> (match b with StringVal b_val -> a_val = b_val | _ -> false)
-  | BoolVal a_val -> (match b with BoolVal b_val -> a_val = b_val | _ -> false)
-  | UnitVal -> (match b with UnitVal -> true | _ -> false)
-  | TupleVal a_val -> (match b with
-    | TupleVal b_val -> (try List.for_all2 val_eq a_val b_val with Invalid_argument -> false)
-    | _ -> false)
-  | VariantVal a_id, a_val -> (match b with VariantVal b_id, b_val -> a_id = b_id && val_eq a_val b_val | _ -> false)
-  | ConstructorVal a_id -> (match b with ConstructorVal b_id -> a_id = b_id | _ -> false)
-  |*)
 
 let bool_binop_fn = function
   | And -> fun a b -> BoolVal (a && b)
@@ -123,6 +121,7 @@ let rec interpret_expr (in_e : ol_expr Context.t) : ol_val =
       (match List.find_map check_branch branches with
         | Some v -> v
         | None -> raise (RuntimeError "No case in match expression matched input"))
+    | BuiltinFunExpr f -> Context.list in_e |> f
     | IntExpr i -> IntVal i
     | BoolExpr b -> BoolVal b
     | StringExpr s -> StringVal s
@@ -140,4 +139,14 @@ let bindings_to_expr (p : ol_prog) =
     | _ -> (* empty program *) UnitExpr in
   List.filter_map (function LetBinding l -> Some l | _ -> None) p |> help
 
-let interpret_prog p = p |> bindings_to_expr |> Context.return |> interpret_expr
+let builtin p f =
+  ClosureVal { params = p; expr = BuiltinFunExpr f |> Context.return; rec_symbol = None }
+
+let interpret_prog p = p
+  |> bindings_to_expr
+  |> (Fun.flip Context.make) [
+    ("int_of_string", builtin ["s"] (fun c -> let s = List.assoc "s" c |> unwrap_string in IntVal (int_of_string s)));
+    ("string_of_int", builtin ["i"] (fun c -> let i = List.assoc "i" c |> unwrap_int in StringVal (string_of_int i)));
+    ("print_string", builtin ["s"] (fun c -> let s = List.assoc "s" c |> unwrap_string in print_endline s; UnitVal))
+  ]
+  |> interpret_expr

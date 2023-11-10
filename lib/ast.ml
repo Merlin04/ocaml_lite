@@ -45,7 +45,22 @@ and ol_expr =
   | StringExpr of string
   | UnitExpr
   | IdExpr of string
+  | BuiltinFunExpr of (_context_entry list -> ol_val) [@printer fun fmt _ -> Format.pp_print_string fmt "<builtin function>"]
 [@@deriving show]
 
-type ol_prog = ol_binding list
+and ol_prog = ol_binding list
 [@@deriving show]
+
+and ol_val =
+  | IntVal of int
+  | StringVal of string
+  | BoolVal of bool
+  | UnitVal
+  | TupleVal of ol_val list
+  | VariantVal of string * ol_val (* non-constant constructor applied to an argument *)
+  | ConstructorVal of string (* constant constructor, or non-constant constructor that hasn't been applied yet - treated like a function *)
+  | ClosureVal of { params : string list; expr : ol_expr _context_t; rec_symbol : string option; } (*[@printer fun fmt _ -> Format.pp_print_string fmt funval_str]*)
+[@@deriving show { with_path = false }]
+(* fix weird circular dependency stuff - ideally this would go in context module but oh well *)
+and _context_entry = (string * ol_val)
+and 'a _context_t = 'a * (_context_entry list)
