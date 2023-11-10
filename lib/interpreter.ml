@@ -5,6 +5,7 @@ exception RuntimeError of string
 module Context = struct
   type 'a t = 'a _context_t
   type entry = _context_entry
+  [@@deriving show]
 
   let return s = (s, [])
   let make s c : 'a t = (s, c)
@@ -16,6 +17,7 @@ module Context = struct
   let ( let- ) = ( map2 )
   let add (e : entry) (a : 'a t) = let- c = a in e :: c
   let join (e : entry list) (a : 'a t) = let- c = a in e @ c
+  let join_end (e : entry list) (a : 'a t) = let- c = a in c @ e
   let get (k : string) (a : 'a t) = let c = list a in List.assoc_opt k c
 end
 
@@ -66,25 +68,37 @@ let rec interpret_expr (in_e : ol_expr Context.t) : ol_val =
           | _ -> raise (RuntimeError "Only expressions which evaluate to closures can be recursive")
         else i in
       e |> with_e_ctx |> Context.add (l.id, bound_val) |> interpret_expr
+
     | FunExpr { params; e; _ } ->
       ClosureVal { params = List.map (fun (p : ol_id_with_t) -> p.id) params; expr = with_e_ctx e; rec_symbol = None }
+
     | ApplExpr { f; a } ->
       let a_val = interpret a in
       let fun_val = interpret f in
       (match fun_val with
         | ClosureVal { params; expr; rec_symbol } ->
           (match params with
-            | h :: t -> let closure_expr_c = expr |> Context.add (h, a_val) in (match t with
-              | [] -> (match rec_symbol with Some self -> closure_expr_c |> Context.add (self, fun_val) | None -> closure_expr_c) |> interpret_expr
-              | _ -> ClosureVal { rec_symbol; params = t; expr = closure_expr_c })
+            | h :: t -> let closure_expr_c = expr
+                |> (match rec_symbol with Some self -> Context.add (self, fun_val) | None -> Fun.id)
+                |> Context.add (h, a_val) (* argument *)
+              in (match t with
+                | _ :: _ -> ClosureVal { rec_symbol = None; params = t; expr = closure_expr_c }
+                | [] ->
+                  closure_expr_c
+                  (* add existing context to expression context if we're dealing with a builtin, so we can have things like print_context  *)
+                  |> (match Context.value expr with BuiltinFunExpr _ -> Context.join_end (Context.list in_e) | _ -> Fun.id)
+                  |> interpret_expr)
             | [] -> raise (RuntimeError "function value has no parameters"))
         | ConstructorVal c -> VariantVal (c, a_val)
         | _ -> raise (RuntimeError "Attempted to apply argument to an expression which is not a closure or constructor"))
+
     | IfExpr { cond; e_if; e_else } ->
       (match interpret cond with
         | BoolVal b -> (if b then e_if else e_else) |> interpret
         | _ -> raise (RuntimeError "If-expression condition must be a boolean"))
+
     | TupleExpr l -> TupleVal (List.map interpret l)
+
     | BinopExpr { a; op; b } ->
       let a_val = interpret a in let b_val = interpret b in
       (match op with
@@ -92,11 +106,13 @@ let rec interpret_expr (in_e : ol_expr Context.t) : ol_val =
         | Eq -> BoolVal(a_val = b_val)
         | And | Or -> let a_bool = unwrap_bool a_val in let b_bool = unwrap_bool b_val in bool_binop_fn op a_bool b_bool
         | _ -> let a_int = unwrap_int a_val in let b_int = unwrap_int b_val in int_binop_fn op a_int b_int)
+
     | UnopExpr { op; e } ->
       let e_val = interpret e in
       (match op with
         | Negate -> let e_int = unwrap_int e_val in IntVal (-e_int)
         | Not -> let e_bool = unwrap_bool e_val in BoolVal (not e_bool))
+
     | MatchExpr { e; branches } ->
       let e_val = interpret e in
       let binding_to_entry id v =
@@ -120,7 +136,8 @@ let rec interpret_expr (in_e : ol_expr Context.t) : ol_val =
           | _ -> None in
       (match List.find_map check_branch branches with
         | Some v -> v
-        | None -> raise (RuntimeError "No case in match expression matched input"))
+        | None -> raise (RuntimeError ("No case in match expression matched input; matching on expression " ^ show_ol_expr e)))
+
     | BuiltinFunExpr f -> Context.list in_e |> f
     | IntExpr i -> IntVal i
     | BoolExpr b -> BoolVal b
@@ -142,11 +159,16 @@ let bindings_to_expr (p : ol_prog) =
 let builtin p f =
   ClosureVal { params = p; expr = BuiltinFunExpr f |> Context.return; rec_symbol = None }
 
+type context_entry_list = Context.entry list
+[@@deriving show]
+
 let interpret_prog p = p
   |> bindings_to_expr
   |> (Fun.flip Context.make) [
     ("int_of_string", builtin ["s"] (fun c -> let s = List.assoc "s" c |> unwrap_string in IntVal (int_of_string s)));
     ("string_of_int", builtin ["i"] (fun c -> let i = List.assoc "i" c |> unwrap_int in StringVal (string_of_int i)));
-    ("print_string", builtin ["s"] (fun c -> let s = List.assoc "s" c |> unwrap_string in print_endline s; UnitVal))
+    ("print_string", builtin ["s"] (fun c -> let s = List.assoc "s" c |> unwrap_string in print_endline s; UnitVal));
+    ("print_debug_val", builtin ["v"] (fun c -> List.assoc "v" c |> show_ol_val |> print_endline; UnitVal));
+    ("print_context", builtin ["u"] (fun c -> show_context_entry_list c |> print_endline; UnitVal));
   ]
   |> interpret_expr
