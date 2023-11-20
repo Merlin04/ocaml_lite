@@ -6,6 +6,7 @@ let () =
     let text = In_channel.input_all ch in
     let () = In_channel.close ch in
     let ast = Ocaml_lite.Parser.parse text in
+    let i = Ocaml_lite.Transform.transform_prog ast in
 (*    let _ = Ocaml_lite.Typechecker.typecheck ast in *)
     let _ = Ocaml_lite.Interpreter.interpret_prog ast in
     ()

@@ -2,10 +2,11 @@ open OUnit2
 open Ocaml_lite.Interpreter
 open Ocaml_lite.Parser
 open Ocaml_lite.Ast
+open Ocaml_lite.Transform
 
 (* we're returning the value of the last binding *)
 let assert_interprets_to (expr : string) (expected : ol_val) =
-  assert_equal ~printer:show_ol_val expected (expr |> parse |> interpret_prog)
+  assert_equal ~printer:show_ol_val expected (expr |> parse |> transform_prog |> interpret_prog_expr)
 
 let test_basic _ =
   assert_interprets_to "let a = 5;;" (IntVal 5)
