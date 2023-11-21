@@ -1,25 +1,25 @@
-open Ast
+open Ast_l2
 open Builtins
 
 let id_is_constructor id = match String.get id 0 with
   | 'A'..'Z' -> true
   | _ -> false
 
-let rec interpret_expr (in_e : ol_expr IContext.t) : ol_val =
+let rec interpret_expr (in_e : ol_expr_l2 IContext.t) : ol_val =
   let with_e_ctx v = IContext.from v in_e in
   let interpret v = v |> with_e_ctx |> interpret_expr in
   match IContext.value in_e with
-    | LetExpr { l; e } ->
+    | LetExpr { id; is_rec; expr; body; _ } ->
       let bound_val =
-        let i = expr_of_ol_let l |> interpret in
-        if l.is_rec then match i with
-          | ClosureVal v -> ClosureVal { v with rec_symbol = Some l.id }
+        let i = interpret expr in
+        if is_rec then match i with
+          | ClosureVal v -> ClosureVal { v with rec_symbol = Some id }
           | _ -> raise (RuntimeError "Only expressions which evaluate to closures can be recursive")
         else i in
-      e |> with_e_ctx |> IContext.add (l.id, bound_val) |> interpret_expr
+      body |> with_e_ctx |> IContext.add (id, bound_val) |> interpret_expr
 
     | FunExpr { params; e; _ } ->
-      ClosureVal { params = List.map (fun (p : ol_id_with_t) -> p.id) params; expr = with_e_ctx e; rec_symbol = None }
+      ClosureVal { params = List.map (fun (p : ol_id_with_t_l2) -> p.id) params; expr = with_e_ctx e; rec_symbol = None }
 
     | ApplExpr { f; a } ->
       let a_val = interpret a in
@@ -52,7 +52,7 @@ let rec interpret_expr (in_e : ol_expr IContext.t) : ol_val =
       let e_val = interpret e in
       let binding_to_entry id v =
         if id = "_" then None else Some (id, v) in
-      let check_branch b =
+      let check_branch (b : ol_expr_l2 Ast_base.ol_match_branch_base) =
         let branch_c = with_e_ctx b.e in
         if not (id_is_constructor b.id) then
           (match binding_to_entry b.id e_val with Some e -> IContext.add e branch_c | None -> branch_c)
@@ -71,7 +71,7 @@ let rec interpret_expr (in_e : ol_expr IContext.t) : ol_val =
           | _ -> None in
       (match List.find_map check_branch branches with
         | Some v -> v
-        | None -> raise (RuntimeError ("No case in match expression matched input; matching on expression " ^ show_ol_expr e)))
+        | None -> raise (RuntimeError ("No case in match expression matched input; matching on expression " ^ show_ol_expr_l2 e)))
 
     | BuiltinFunExpr f -> IContext.list in_e |> f
     | IntExpr i -> IntVal i
@@ -84,7 +84,7 @@ let rec interpret_expr (in_e : ol_expr IContext.t) : ol_val =
         else (match IContext.get s in_e with
           | Some v -> v
           | None -> raise (RuntimeError ("Unbound symbol " ^ s)))
-    | _ -> failwith "Expression should have been transformed away"
+(*    | _ -> failwith "Expression should have been transformed away" *)
 
 let interpret_prog_expr p = p
   |> (Fun.flip IContext.make) builtin_icontext

@@ -1,4 +1,4 @@
-open Ast
+open Ast_l1
 open Grammar
 
 include Nice_parser.Make(struct

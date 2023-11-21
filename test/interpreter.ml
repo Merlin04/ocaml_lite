@@ -1,7 +1,7 @@
 open OUnit2
 open Ocaml_lite.Interpreter
 open Ocaml_lite.Parser
-open Ocaml_lite.Ast
+open Ocaml_lite.Ast_l2
 open Ocaml_lite.Transform
 
 (* we're returning the value of the last binding *)

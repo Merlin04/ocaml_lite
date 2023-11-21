@@ -1,6 +1,6 @@
 open OUnit2
 open Ocaml_lite.Parser
-open Ocaml_lite.Ast
+open Ocaml_lite.Ast_l1
 
 let p_assert_equal code expr = assert_equal (parse code) expr ~printer:show_ol_prog
 

@@ -1,6 +1,6 @@
 %{
 
-open Ast
+open Ast_l1
 
 let build_appl = function
   | h :: t -> List.fold_left (fun acc cur -> ApplExpr { f = acc; a = cur }) h t
@@ -56,10 +56,10 @@ let build_appl = function
 %type <ol_id_with_t> type_binding_constructor
 %type <ol_binding> binding
 %type <ol_id_with_t> param
-%type <ol_expr> expr, expr_appl, expr_other
+%type <ol_expr> expr, expr_appl, expr_floating, expr_other
 %type <ol_match_branch> match_branch
 %type <string list> pattern_vars
-%type <ol_type> ol_type
+%type <ol_type> ol_type, ol_type_other, ol_type_fun, ol_type_tuple
 %type <ol_binop> binop
 %type <ol_unop> unop
 

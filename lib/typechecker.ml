@@ -1,5 +1,4 @@
-open Ast
-open Tc_type
+open Ast_l2
 open Builtins
 
 exception TCError of string
@@ -26,15 +25,25 @@ end
 open Constraints
 
 let f_counter = ref 0
-let fresh_var () = let v = !f_counter in f_counter := v + 1; TVar ("'" ^ string_of_int v)
+let fresh_var () = let v = !f_counter in f_counter := v + 1; TVar v
 
-let rec get_constraints (env : Env.t) : ol_expr -> tc_type Constraints.t =
+type tvar_mapping = int * tc_type
+
+let rec unify_constraint : Constraints.entry -> tvar_mapping list Constraints.t = function
+  | (TVar v1), b -> (match b with
+    | TVar v2 when v1 = v2 -> []
+    | _ -> [(v1, b)]) |> Constraints.return
+  | (TFun (arg_a, body_a)), (TFun (arg_b, body_b)) -> [(arg_a, arg_b); (body_a, body_b)] |> Constraints.make []
+  | (TTuple a), (TTuple b) when List.length a = List.length b -> List.map2 (fun at bt -> (at, bt)) a b |> Constraints.make []
+  | TInt, TInt | TBool, TBool | TString, TString | TUnit, TUnit -> Constraints.return []
+  | a, b -> raise (TCError ("Failed to unify types " ^ show_tc_type a ^ " and " ^ show_tc_type b))
+
+and get_constraints (env : Env.t) : ol_expr_l2 -> tc_type Constraints.t =
   let get_c = get_constraints env in function
-  | LetExpr { l; e } ->
-    let { id; is_rec; expr } = l in
+  | LetExpr { id; is_rec; t; expr; body } ->
     let t_b = fresh_var () in
     let* t_val = get_constraints (env |> Env.add_opt id (if is_rec then Some t_b else None)) expr in
-    let t_body = get_constraints ((id, t_b) :: env) e in t_body |> Constraints.add (t_b, t_val)
+    let t_body = get_constraints ((id, t_b) :: env) body in t_body |> Constraints.add (t_b, t_val)
   | FunExpr { params; t; e } ->
     let (param, body) = (match params with
       | [p] -> (p, e)
@@ -42,9 +51,9 @@ let rec get_constraints (env : Env.t) : ol_expr -> tc_type Constraints.t =
       | _ -> failwith "Received function with no params"
     ) in
     let t_arg = fresh_var () in
-    let body_env = [(param.id, t_arg)] |> Env.add_opt param.id (Option.map tc_type_of_ol param.t) in
+    let body_env = [(param.id, t_arg)] |> Env.add_opt param.id param.t in
     let* t_body = get_constraints body_env body in
-    Constraints.return (TFun (t_arg, t_body)) |> Constraints.add_opt t_body (Option.map tc_type_of_ol t)
+    Constraints.return (TFun (t_arg, t_body)) |> Constraints.add_opt t_body t
   | ApplExpr { f; a } ->
     let t = fresh_var () in
     let* t_f = get_c f in
@@ -62,7 +71,9 @@ let rec get_constraints (env : Env.t) : ol_expr -> tc_type Constraints.t =
       let+ t_cur = cur in
       t_cur :: a_acc
     ) (Constraints.return []) >|= (fun v -> TTuple v)
-  | MatchExpr
+  (*| MatchExpr { e; branches } ->
+    let* t_e = get_c e in
+*)
   | v -> Constraints.return (match v with
     | IdExpr i -> env |> Env.get i
     | IntExpr _ -> TInt
@@ -71,15 +82,4 @@ let rec get_constraints (env : Env.t) : ol_expr -> tc_type Constraints.t =
     | UnitExpr -> TUnit
   )
 
-
-
-
-
-let rec get_type_of : ol_expr -> (ol_type, string) result = function
-  | IntExpr _ -> Ok IntType
-  | BoolExpr _ -> Ok BoolType
-  | StringExpr _ -> Ok StringType
-  | UnitExpr -> Ok UnitType
-  | _ -> Error "typechecking expression is unimplemented"
-
-let is_well_typed e = e |> get_type_of |> Result.is_ok
+(* let is_well_typed e = e |> get_type_of |> Result.is_ok *)

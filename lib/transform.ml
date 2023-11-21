@@ -1,4 +1,22 @@
-open Ast
+open Ast_base
+open Ast_l1
+open Ast_l2
+
+let id_of_binop = function
+  | Plus -> "+"
+  | Minus -> "-"
+  | Times -> "*"
+  | Divide -> "/"
+  | Mod -> "\\mod" (* \ is not a character users can use in ids *)
+  | Lt -> "<"
+  | Eq -> "="
+  | Concat -> "^"
+  | And -> "&&"
+  | Or -> "||"
+
+let id_of_unop = function
+  | Not -> "\\not"
+  | Negate -> "~"
 
 (* having separate tc and ol types makes things nicer in some places,
    but also means we have to do things like this *)
@@ -18,7 +36,7 @@ let rec bindings_to_expr (p : ol_prog) : ol_expr =
   List.filter_map (function LetBinding l -> Some l | _ -> None) p |> help
 
 and transform_match_branch (b : ol_match_branch) : ol_expr_l2 ol_match_branch_base = { id = b.id; vars = b.vars; e = transform_expr b.e }
-and transform_id_with_t (i : ol_id_with_t) : tc_type ol_id_with_t_base = { i with t = Option.map tc_type_of_ol i.t }
+and transform_id_with_t (i : ol_id_with_t) : ol_id_with_t_l2 = { i with t = Option.map tc_type_of_ol i.t }
 and expr_of_ol_let (o : ol_let) : ol_expr_l2 = match o.params with
   | [] -> transform_expr o.expr
   | _ -> FunExpr { params = List.map transform_id_with_t o.params; t = Option.map tc_type_of_ol o.t; e = transform_expr o.expr }
