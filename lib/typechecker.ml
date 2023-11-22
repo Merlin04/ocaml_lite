@@ -39,7 +39,7 @@ let fresh_var () = let v = !f_counter in f_counter := v + 1; TVar v
 type tvar_mapping = int * tc_type
 
 let rec occurs_in (i : int) : tc_type -> bool =
-  let r = occurs_in i in function
+  let r t = occurs_in i t in function
     | TFun (a, b) -> r a || r b
     | TTuple l -> List.exists r l
     | TVar v -> v = i
@@ -59,20 +59,21 @@ let rec substitute (m : tvar_mapping) = function
 
 let substitute_p (m : tvar_mapping) = function
   | Poly (is, t) -> Poly (is, substitute m t)
-  | t -> t
+  | Mono t -> Mono (substitute m t)
 
 let instantiate : tc_type_p -> tc_type = function
   | Poly (is, t) -> List.fold_left (fun acc i -> substitute (i, fresh_var ()) acc) t is
   | Mono t -> t
 
 let unify_constraint_mono : (tc_type * tc_type) -> unify_result = function
-  | (TVar v1), b -> (match b with
+  | (TVar v1), b | b, (TVar v1) -> (match b with
       | TVar v2 when v1 = v2 -> []
       | _ -> if occurs_in v1 b then raise (TCError "Infinite types are unsupported") else [(v1, b)])
     |> Constraints.return
   | (TFun (arg_a, body_a)), (TFun (arg_b, body_b)) -> [mono_c (arg_a, arg_b); mono_c (body_a, body_b)] |> Constraints.make []
   | (TTuple a), (TTuple b) when List.length a = List.length b -> List.map2 (fun at bt -> mono_c (at, bt)) a b |> Constraints.make []
-  | TInt, TInt | TBool, TBool | TString, TString | TUnit, TUnit -> Constraints.return []
+(*  | TInt, TInt | TBool, TBool | TString, TString | TUnit, TUnit -> Constraints.return [] *)
+  | a, b when a = b -> Constraints.return []
   | a, b -> raise (TCError ("Failed to unify types " ^ show_tc_type a ^ " and " ^ show_tc_type b))
 
 let unify_constraint ((a, b) : Constraints.entry) : unify_result =
@@ -90,10 +91,14 @@ let unify (l : Constraints.entry list) : unify_result =
     | [] -> r
   in Constraints.make [] l |> unify_inner
 
+(* type constraints_list = Constraints.entry list *)
+(* [@@deriving show] *)
+
 let generalize (env : Env.t) (l : Constraints.entry list) (t : tc_type_p) : tc_type_p =
   match t with
     | Poly _ -> t
     | Mono t ->
+(*  print_endline ("Constraints from generalize: " ^ (show_constraints_list l)); *)
   let mappings = unify l |> Constraints.value in
   let env1 = List.map (fun (k, t) -> (k, List.fold_left (Fun.flip substitute_p) t mappings)) env in
   let t1 = List.fold_left (Fun.flip substitute) t mappings in
@@ -105,16 +110,19 @@ let generalize (env : Env.t) (l : Constraints.entry list) (t : tc_type_p) : tc_t
   in
   Poly (collect_vars t1, t1)
 
+type aaaa = tc_type_p Constraints.t
+[@@deriving show]
+
 let rec get_constraints (env : Env.t) : ol_expr_l2 -> tc_type_p Constraints.t =
-  let get_c = get_constraints env in function
+  let get_c v = get_constraints env v in function
   | LetExpr { id; is_rec; t; expr; body } ->
-    let (t_val, t_c) = get_constraints env expr in
+    let self = fresh_var () in
+    let env_expr = if is_rec then (id, Mono self) :: env else env in
+    let (t_val, t_c) = (let* t_val = get_constraints env_expr expr in
+      Constraints.return t_val |> Constraints.add_opt t_val (map_mono t) |> Constraints.add_opt t_val (if is_rec then Some (Mono self) else None)) in
     let g = generalize env t_c t_val in
     let t_body = get_constraints ((id, g) :: env) body in
-    Constraints.join t_c t_body |> Constraints.add_opt t_val (map_mono t)
-    (*let t_b = fresh_var () in
-    let* t_val = get_constraints (env |> Env.add_opt id (if is_rec then Some t_b else None)) expr in
-    let t_body = get_constraints ((id, t_b) :: env) body in t_body |> Constraints.add (t_b, t_val)*)
+    Constraints.join t_c t_body
   | TypeBindingExpr { t = { id; t }; body } ->
     get_constraints ((List.map (fun ({ id = c_id; t } : ol_id_with_t_l2) -> (c_id, Mono (match t with
       | None -> TId id
@@ -127,7 +135,7 @@ let rec get_constraints (env : Env.t) : ol_expr_l2 -> tc_type_p Constraints.t =
       | _ -> failwith "Received function with no params"
     ) in
     let t_arg = fresh_var () in
-    let body_env = [(param.id, Mono t_arg)] |> Env.add_opt param.id (map_mono param.t) in
+    let body_env = ((param.id, Mono t_arg) :: env) |> Env.add_opt param.id (map_mono param.t) in
     let* t_body = get_constraints body_env body in
     Constraints.return (Mono (TFun (t_arg, unwrap_p t_body))) |> Constraints.add_opt t_body (map_mono t)
   | ApplExpr { f; a } ->
@@ -146,11 +154,31 @@ let rec get_constraints (env : Env.t) : ol_expr_l2 -> tc_type_p Constraints.t =
       let* a_acc = acc in
       let+ t_cur = cur in
       (unwrap_p t_cur) :: a_acc
-    ) (Constraints.return []) in
+    ) (Constraints.return []) >|= List.rev in
      Mono (TTuple v)
-  (*| MatchExpr { e; branches } ->
-    let* t_e = get_c e in
-*)
+  | MatchExpr { e; branches } ->
+    let* t = get_c e in
+    let typecheck_branch ({ id; vars; e } : ol_match_branch_l2) =
+      (* look up in typechecking context *)
+      let* e_env = match env |> Env.get id |> unwrap_p with
+        | TFun (a, t_pattern) -> (match a with
+          | TTuple l -> if (List.length l) = (List.length vars)
+            then (Constraints.make (List.map2 (fun v t -> (v, Mono t)) vars l) [(t, Mono t_pattern)])
+            else (raise (TCError "Unexpected number of variables in tuple destructuring in match pattern"))
+          | _ -> (match vars with
+            | [v] -> Constraints.make [(v, Mono a)] [(t, Mono t_pattern)]
+            | _ -> raise (TCError "Unexpected number of variables for constructor")))
+        | t_pattern -> Constraints.make [] [(t, Mono t_pattern)] in
+      get_constraints (e_env @ env) e in
+    (* merge constraints *)
+    let* t_branches = List.fold_left (fun acc cur ->
+      let* a = acc in
+      let+ b = typecheck_branch cur in
+      b :: a) (Constraints.return []) branches in
+    (* generate constraints for pattern body types *)
+    (match t_branches with
+      | h :: t -> Constraints.make h (List.map (fun a -> (h, a)) t)
+      | [] -> raise (TCError "Match did not have any branches"))
   | v -> Constraints.return (match v with
     | IdExpr i -> env |> Env.get i
     | IntExpr _ -> Mono TInt
@@ -159,4 +187,7 @@ let rec get_constraints (env : Env.t) : ol_expr_l2 -> tc_type_p Constraints.t =
     | UnitExpr -> Mono TUnit
   )
 
-(* let is_well_typed e = e |> get_type_of |> Result.is_ok *)
+let typecheck e = e |> get_constraints builtin_env |> ignore
+
+ let is_well_typed e = try (typecheck e; true) with
+  | _ -> false

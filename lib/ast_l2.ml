@@ -32,6 +32,8 @@ type ol_expr_l2 =
   | IdExpr of string
   | BuiltinFunExpr of (_context_entry list -> ol_val) [@printer fun fmt _ -> Format.pp_print_string fmt "<builtin function>"]
 
+and ol_match_branch_l2 = ol_expr_l2 ol_match_branch_base
+
 (* interpretation stuff *)
 
 and ol_val =

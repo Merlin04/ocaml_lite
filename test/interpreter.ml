@@ -59,6 +59,9 @@ let test_first_class_variants _ = (* :) *)
 let test_constructors _ =
   assert_interprets_to "let _ = A;;" (ConstructorVal "A")
 
+let test_type_bindings _ =
+  assert_interprets_to "type a = H;; let _ = 5;; type b = J;;" (IntVal 5)
+
 let interpreter_tests =
   "test suite for interpreter"
   >::: [
@@ -78,4 +81,5 @@ let interpreter_tests =
     "tuple order" >:: test_tuples;
     "first-class variants" >:: test_first_class_variants;
     "constructors" >:: test_constructors;
+    "type bindings in interpreted expression" >:: test_type_bindings;
   ]
