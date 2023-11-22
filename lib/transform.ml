@@ -29,12 +29,18 @@ let rec tc_type_of_ol = function
   | UnitType -> TUnit
   | IdType d -> TId d
 
-let rec bindings_to_expr (p : ol_prog) : ol_expr =
-  let rec help : ol_let list -> ol_expr = function
-    | l :: t -> LetExpr { l; e = match t with [] -> IdExpr l.id | _ -> help t }
+let rec bindings_to_expr_l2 (p : ol_prog) : ol_expr_l2 =
+  let rec help = function
+    | b :: tail -> (match b with
+      | LetBinding ({ id; is_rec; params; t; expr } as l) ->
+        LetExpr { id; is_rec; t = if params = [] then Option.map tc_type_of_ol t else None; expr = expr_of_ol_let l;
+          body = match (List.filter (fun v -> match v with LetBinding _ -> true | _ -> false) tail) with
+            | [] -> IdExpr l.id
+            | _ -> help tail }
+      | TypeBinding t -> TypeBindingExpr { t = transform_type_binding t; body = help tail } )
     | _ -> (* empty program *) UnitExpr in
-  List.filter_map (function LetBinding l -> Some l | _ -> None) p |> help
-
+  p |> help
+and transform_type_binding ({ id; t } : ol_type ol_type_binding_base) : tc_type ol_type_binding_base = { id; t = List.map transform_id_with_t t }
 and transform_match_branch (b : ol_match_branch) : ol_expr_l2 ol_match_branch_base = { id = b.id; vars = b.vars; e = transform_expr b.e }
 and transform_id_with_t (i : ol_id_with_t) : ol_id_with_t_l2 = { i with t = Option.map tc_type_of_ol i.t }
 and expr_of_ol_let (o : ol_let) : ol_expr_l2 = match o.params with
@@ -44,7 +50,7 @@ and transform_expr : ol_expr -> ol_expr_l2 = function
   | BinopExpr { a; op; b } -> ApplExpr { f = ApplExpr { f = IdExpr (id_of_binop op); a = transform_expr a }; a = transform_expr b }
   | UnopExpr { op; e } -> ApplExpr { f = IdExpr (id_of_unop op); a = transform_expr e }
   | LetExpr { l = { id; is_rec; params; t; expr } as l; e } ->
-    LetExpr { id; is_rec; t = Option.map tc_type_of_ol t; expr = expr_of_ol_let l ; body = transform_expr e }
+    LetExpr { id; is_rec; t = if params = [] then Option.map tc_type_of_ol t else None; expr = expr_of_ol_let l ; body = transform_expr e }
   | FunExpr { params; t; e } ->
     FunExpr { params = List.map transform_id_with_t params; t = Option.map tc_type_of_ol t; e = transform_expr e }
   | ApplExpr { f; a } -> ApplExpr { f = transform_expr f; a = transform_expr a }
@@ -57,4 +63,4 @@ and transform_expr : ol_expr -> ol_expr_l2 = function
   | UnitExpr -> UnitExpr
   | IdExpr s -> IdExpr s
 
-let rec transform_prog p = p |> bindings_to_expr |> transform_expr
+let rec transform_prog p = p |> bindings_to_expr_l2

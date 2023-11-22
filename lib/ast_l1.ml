@@ -24,9 +24,7 @@ type ol_let = {
   expr : ol_expr }
 [@@deriving show]
 and ol_binding =
-  | TypeBinding of {
-    id : string;
-    t : ol_id_with_t list }
+  | TypeBinding of ol_type ol_type_binding_base
   | LetBinding of ol_let
 [@@deriving show]
 and ol_match_branch = ol_expr ol_match_branch_base

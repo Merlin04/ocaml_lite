@@ -9,6 +9,7 @@ let rec interpret_expr (in_e : ol_expr_l2 IContext.t) : ol_val =
   let with_e_ctx v = IContext.from v in_e in
   let interpret v = v |> with_e_ctx |> interpret_expr in
   match IContext.value in_e with
+    | TypeBindingExpr { body; _ } -> interpret body
     | LetExpr { id; is_rec; expr; body; _ } ->
       let bound_val =
         let i = interpret expr in
