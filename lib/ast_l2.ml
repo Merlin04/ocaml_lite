@@ -17,8 +17,11 @@ type tc_type_p = Mono of tc_type | Poly of (int list) * tc_type
 
 type ol_id_with_t_l2 = tc_type ol_id_with_t_base
 
-type ol_expr_l2 =
-  | LetExpr of { id : string; is_rec : bool; t : tc_type option; expr : ol_expr_l2; body : ol_expr_l2 }
+type ol_let_l2 = { id : string; is_rec : bool; t : tc_type option; expr : ol_expr_l2; body : ol_expr_l2 }
+[@@deriving show]
+
+and ol_expr_l2 =
+  | LetExpr of ol_let_l2
   | TypeBindingExpr of { t : tc_type ol_type_binding_base; body : ol_expr_l2 }
   | FunExpr of (ol_expr_l2, tc_type) ol_fun_base
   | ApplExpr of ol_expr_l2 ol_appl_base

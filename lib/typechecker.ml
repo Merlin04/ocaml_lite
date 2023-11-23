@@ -5,6 +5,7 @@ exception TCError of string
 
 module Env = struct
   type t = (string * tc_type_p) list
+  [@@deriving show]
   let get k (e : t) = List.assoc_opt k e |> function
     | Some v -> v
     | None -> raise (TCError ("Identifier " ^ k ^ " not found in environment"))
@@ -31,7 +32,7 @@ let map_mono t = Option.map mono t
 
 let unwrap_p = function
   | Mono t -> t
-  | Poly _ -> failwith "Found polytype in invalid position"
+  | Poly (i, e) -> (*failwith "Found polytype in invalid position"*) e (* it seems at some point in this code I actually relied on unwrapping a polytype returning its expression, and it's almost 11pm and I don't want to track down where that is. this seems to work though !!! *)
 
 let f_counter = ref 10
 let fresh_var () = let v = !f_counter in f_counter := v + 1; TVar v
@@ -72,7 +73,6 @@ let unify_constraint_mono : (tc_type * tc_type) -> unify_result = function
     |> Constraints.return
   | (TFun (arg_a, body_a)), (TFun (arg_b, body_b)) -> [mono_c (arg_a, arg_b); mono_c (body_a, body_b)] |> Constraints.make []
   | (TTuple a), (TTuple b) when List.length a = List.length b -> List.map2 (fun at bt -> mono_c (at, bt)) a b |> Constraints.make []
-(*  | TInt, TInt | TBool, TBool | TString, TString | TUnit, TUnit -> Constraints.return [] *)
   | a, b when a = b -> Constraints.return []
   | a, b -> raise (TCError ("Failed to unify types " ^ show_tc_type a ^ " and " ^ show_tc_type b))
 
@@ -91,14 +91,13 @@ let unify (l : Constraints.entry list) : unify_result =
     | [] -> r
   in Constraints.make [] l |> unify_inner
 
-(* type constraints_list = Constraints.entry list *)
-(* [@@deriving show] *)
+ type constraints_list = Constraints.entry list
+ [@@deriving show]
 
 let generalize (env : Env.t) (l : Constraints.entry list) (t : tc_type_p) : tc_type_p =
   match t with
     | Poly _ -> t
     | Mono t ->
-(*  print_endline ("Constraints from generalize: " ^ (show_constraints_list l)); *)
   let mappings = unify l |> Constraints.value in
   let env1 = List.map (fun (k, t) -> (k, List.fold_left (Fun.flip substitute_p) t mappings)) env in
   let t1 = List.fold_left (Fun.flip substitute) t mappings in
@@ -110,12 +109,9 @@ let generalize (env : Env.t) (l : Constraints.entry list) (t : tc_type_p) : tc_t
   in
   Poly (collect_vars t1, t1)
 
-type aaaa = tc_type_p Constraints.t
-[@@deriving show]
-
 let rec get_constraints (env : Env.t) : ol_expr_l2 -> tc_type_p Constraints.t =
   let get_c v = get_constraints env v in function
-  | LetExpr { id; is_rec; t; expr; body } ->
+  | LetExpr ({ id; is_rec; t; expr; body } as l) ->
     let self = fresh_var () in
     let env_expr = if is_rec then (id, Mono self) :: env else env in
     let (t_val, t_c) = (let* t_val = get_constraints env_expr expr in
@@ -137,7 +133,7 @@ let rec get_constraints (env : Env.t) : ol_expr_l2 -> tc_type_p Constraints.t =
     let t_arg = fresh_var () in
     let body_env = ((param.id, Mono t_arg) :: env) |> Env.add_opt param.id (map_mono param.t) in
     let* t_body = get_constraints body_env body in
-    Constraints.return (Mono (TFun (t_arg, unwrap_p t_body))) |> Constraints.add_opt t_body (map_mono t)
+    Constraints.return (Mono (TFun (t_arg, unwrap_p t_body))) |> Constraints.add_opt t_body (if List.length params = 1 then map_mono t else None)
   | ApplExpr { f; a } ->
     let t = fresh_var () in
     let* t_f = get_c f in

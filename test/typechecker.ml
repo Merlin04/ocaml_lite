@@ -34,6 +34,9 @@ let test_type_constructors _ =
 let test_type_constructors_check _ =
   assert_well_typed "type a = | A | B of int;; let b : a = B true;;" false
 
+let test_recursive _ =
+  assert_well_typed "let rec a n = a n;; let _ = a 5;;" true
+
 let typechecker_tests =
   "test suite for typechecker"
   >::: [
@@ -46,4 +49,5 @@ let typechecker_tests =
     "match inference" >:: test_match;
     "type constructors" >:: test_type_constructors;
     "type constructors type-check properly" >:: test_type_constructors_check;
+    "recursive function" >:: test_recursive;
   ]
